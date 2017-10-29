@@ -1,0 +1,96 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Mitsuaki Nakata"
+date: "2017/10/29"
+output: html_document
+---
+
+### Executive Summary
+
+The goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. This report describing how I built my model, how I used cross validation, what I think the expected out of sample error is, and why I made the choices. I will also use my prediction model to predict 20 different test cases.
+
+### Load and explore the data
+
+Download the data and explore it.
+```{r echo=TRUE}
+library(caret)
+library(randomForest)
+
+#download.file(url="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile="pml-training.csv")
+#download.file(url="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile="pml-testing.csv")
+
+train <- read.csv("pml-training.csv")
+str(train)
+
+#As summary result is too long, I won't display the result in the report
+#summary(train)
+
+```
+
+
+### Clean the data
+
+There are "NA","#DIV/0!" and empty string in the data. These data should be treated as NA.
+```{r echo=TRUE}
+training <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+```
+
+Some columns contain NA values, I will remove these columns for further processing.
+```{r echo=TRUE}
+training2 <- training[, colSums(is.na(training)) == 0]
+testing2 <- testing[, colSums(is.na(testing)) == 0]
+```
+
+There are some columns not related to the prediction, such as timestamp, user name. I will remove these columns for further processing.
+```{r echo=TRUE}
+training3 <- subset(training2, select = -c(X, user_name, raw_timestamp_part_1,  raw_timestamp_part_2, cvtd_timestamp))
+testing3 <- subset(testing2, select = -c(X, user_name, raw_timestamp_part_1,  raw_timestamp_part_2, cvtd_timestamp))
+```
+
+### Train Model
+
+Split the data for training and testing. User 70% for training.
+```{r echo=TRUE}
+set.seed(1234)
+
+indTraining <- createDataPartition(y=training3$classe, p=0.7, list=FALSE)
+trainingData <- training3[indTraining, ]
+testData <- training3[-indTraining, ]
+```
+
+Train model with Random Forest algorithm and use cross validation.
+```{r echo=TRUE}
+#As with the default ntree value, the training process didn't finish on my computer.
+#Use ntree=100
+model <- train(classe ~., method="rf", data=trainingData, trControl=trainControl(method='cv'), preProcess=c('center', 'scale'), number=5, allowParallel=TRUE, importance=TRUE, ntree=100)
+model
+```
+
+### Evaluate Model
+
+Evaluate the model with test data set.
+```{r echo=TRUE}
+testPrediction <- predict(model, testData)
+testPredictionMatrix <- confusionMatrix(testData$classe, testPrediction)
+testPredictionMatrix
+```
+
+Model accuracy
+```{r echo=TRUE}
+testPredictionMatrix$overall[["Accuracy"]]
+```
+
+Model error rate
+```{r echo=TRUE}
+errorRate = 1 - testPredictionMatrix$overall[["Accuracy"]]
+errorRate
+```
+
+### Predict test cases
+
+Predict 20 different test cases.
+```{r echo=TRUE}
+testCasePrediction <- predict(model, testing)
+testCasePrediction
+```
